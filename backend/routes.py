@@ -20,8 +20,26 @@ import json
 
 from convex import ConvexClient
 
+from pymongo.mongo_client import MongoClient
+from pymongo.server_api import ServerApi
+
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from flask import Flask, jsonify
+from flask_cors import CORS, cross_origin
+
 load_dotenv(".env.local")
 load_dotenv()
+
+mongo_uri = os.getenv("MONGO_CONNECTION")
+mongo_client = MongoClient(mongo_uri, server_api=ServerApi('1'))
+mongodb = mongo_client.brokerai
+foodhall_collection = mongodb["foodhalls"]
+
+try:
+    mongo_client.admin.command('ping')
+    print("Pinged your deployment. You successfully connected to MongoDB!")
+except Exception as e:
+    print(e)
 
 client = ConvexClient(os.getenv("NEXT_PUBLIC_CONVEX_URL"))
 
@@ -31,16 +49,16 @@ app = Flask(__name__)
 @app.get("/crawler/new/<search_key>")
 @cross_origin()
 def start_new_crawl(search_key):
-
-    def task(client, search_key: str):
+    def task(client, search_key: str): # looks like this is how nathan mutated convex data. 
         id = client.mutation("findings:createFoodHall", {
                              "name": search_key.title()})
-        hall = ResearchHall.ResearchHall(client, id, search_key.title())
+        hall = ResearchHall.ResearchHall(client, foodhall_collection, id, search_key.title())
         hall.run_in_parallel()
+        print(hall)
         print("Done!")
 
     threading.Thread(target=task, args=(client, search_key)).start()
-
+    
     return "{ 'status': 'success' }"
 
 
@@ -64,15 +82,23 @@ def get_relevant_halls():
 @cross_origin()
 def get_new_halls_today():
     """Reads from Google alerts and adds food halls to database"""
-    hall_objects = get_relevant_halls()["relevant_halls"][:3]
+    hall_objects = get_relevant_halls()["relevant_halls"][:3]  # Limiting to 3 for the example
 
-    for hall in hall_objects:
-        name = hall['food_hall_name']
-        start_new_crawl(name)
-        # need to add a wait for each iteration 
+    # Use ThreadPoolExecutor to manage threads
+    with ThreadPoolExecutor(max_workers=5) as executor:
+        # Create a future for each API call
+        futures = [executor.submit(start_new_crawl, hall['food_hall_name']) for hall in hall_objects]
 
-    # check database for valid research 
-    return "{ 'status': 'success' }"
+        # Optionally, wait for each to complete and handle their result
+        for future in as_completed(futures):
+            try:
+                result = future.result()
+                print(f"Task completed with result: {result}")
+            except Exception as e:
+                print(f"Task generated an exception: {e}")
+
+    # Check database for valid research 
+    return jsonify({"status": "success"})
 
 @app.route("/done")
 def finish_page():

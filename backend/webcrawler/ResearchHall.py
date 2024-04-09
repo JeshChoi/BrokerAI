@@ -2,6 +2,7 @@ import json
 import os
 import re
 import threading
+from datetime import datetime
 
 import requests
 import screeninfo
@@ -26,15 +27,17 @@ client = OpenAI(api_key=open_ai_key)
 
 
 class ResearchHall:
-    def __init__(self, client, id: str, food_hall: str):
+    def __init__(self, client, mongo_collection, id: str, food_hall: str):
         food_hall = food_hall.strip().lower()
         if 'food hall' not in food_hall:
             food_hall = f'{food_hall} food hall'
 
         self.client = client
+        self.mongo_collection = mongo_collection
         self.id = id
         self.food_hall = food_hall
         self.sources = []
+        self.mongo_foodhall = None
 
     def gpt_request(self, gpt_instruction: str, user_prompt: str):
         """return a list of names of relevant halls"""
@@ -272,12 +275,32 @@ class ResearchHall:
         res = get_images(self.food_hall, browser)
         return res, None
 
-    def updateDB(self, data: dict):
+    def updateDB(self, data: dict, source: dict):
         """Updates the database with the data"""
         print(f"Updating database with {data.keys()}")
         self.client.mutation("findings:updateFoodHall",
                              {"id": self.id, "fields": data})
         # MONGO DB changes here 
+        new_data = {key: {"value": value, "source": source} for key, value in data.items()}
+        if self.mongo_foodhall is None: 
+            food_hall = self.mongo_collection.find_one({"name": self.food_hall})
+            
+            if food_hall is not None: 
+                self.mongo_foodhall = food_hall
+            else:
+                # create new food hall in the database 
+                new_foodhall = self.mongo_collection.insert_one({'name': self.food_hall, 'createdAt': datetime.now(),})
+                self.mongo_foodhall = new_foodhall
+                pass 
+        # make updates to the mongodb food hall 
+        update_result = self.mongo_collection.update_one(
+            {"name": self.food_hall},  # Use the document's _id for the filter
+            {"$set": new_data,
+             '$currentDate': {'updatedAt': True}  # Automatically set the update timestamp
+            },  # Use the '$set' operator to update fields
+            
+        )
+        print(f"Updated {update_result.modified_count} document(s).")
         pass
 
     def browser_research(self, browser, tasks):
@@ -294,18 +317,20 @@ class ResearchHall:
 
                 if "data" in data and data["data"] == None:
                     continue
-
+                source = None        
                 if google_link:
                     label_formatted = task.__name__.replace(
                         "get_", "").replace("_", " ").title()
                     self.sources.append(
                         {"source": google_link, "label": label_formatted})
+                    source = {"source": google_link, "label": label_formatted}
+                print(data, source)
 
-                self.updateDB(data)
+                self.updateDB(data, source)
             else:
                 print(f"Data not found for {task.__name__}")
 
-            self.updateDB({"sources": self.sources})
+            self.updateDB({"sources": self.sources}, {})
 
     def run_in_parallel(self):
         options = Options()
@@ -392,6 +417,14 @@ class ResearchHall:
         browser2.quit()
         browser3.quit()
         browser4.quit()
+    def __str__(self):
+        """
+        Returns a string representation of all attributes and their values
+        for the ResearchHall object.
+        """
+        attributes = vars(self)
+        attributes_str = ', '.join(f"{key}={value!r}" for key, value in attributes.items())
+        return f"{self.__class__.__name__}({attributes_str})"
 
 
 if __name__ == '__main__':

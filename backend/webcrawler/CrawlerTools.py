@@ -24,7 +24,8 @@ def valid_url(url: str) -> bool:
     unnecessary_links = (
         'https://www.instagram.com',
         'https://www.google.com/search',
-        'https://www.facebook.com/'
+        'https://www.facebook.com/',
+        'https://www.youtube.com/'
     )
     return url and not url.startswith(unnecessary_links)
 
