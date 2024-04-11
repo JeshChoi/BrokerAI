@@ -29,6 +29,8 @@ from pymongo.server_api import ServerApi
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from flask import Flask, jsonify
 from flask_cors import CORS, cross_origin
+from bson import json_util
+
 
 load_dotenv(".env.local")
 load_dotenv()
@@ -47,7 +49,46 @@ except Exception as e:
 client = ConvexClient(os.getenv("NEXT_PUBLIC_CONVEX_URL"))
 
 app = Flask(__name__)
+@app.get("/api/foodhalls/count")
+@cross_origin()
+def get_foodhalls_count():
+    """Returns number of foodhalls in mongodb
+    """
+    foodhall_count = foodhall_collection.count_documents({})
 
+    res = jsonify({
+        "foodhalls_count": foodhall_count
+    })
+    res.status_code = 200
+    print(res)
+
+    return res
+
+@app.get("/api/foodhalls/")
+@cross_origin()
+def get_foodhalls():
+    """Returns foods hall in the database. Limit of limit, offset by offset
+    REQUEST body: 
+        {
+            limit: int, 
+            offset: int,
+        }
+    """
+    limit = request.args.get('limit', default=10, type=int)  # Default to 10 if not provided
+    offset = request.args.get('offset', default=0, type=int) # Default to 0 if not provided
+    foodhalls_cursor  = foodhall_collection.find().sort('updatedAt', -1).skip(offset).limit(limit)
+    foodhalls = list(foodhalls_cursor)
+    
+    # Convert the list of MongoDB objects to a JSON string and then back to a dictionary
+    # This is because MongoDB objects might not be directly serializable to JSON
+    foodhalls_json = json.loads(json_util.dumps(foodhalls))
+    res = jsonify({
+        "foodhalls": foodhalls_json
+    })
+    res.status_code = 200
+    print(res)
+
+    return res
 
 @app.get("/crawler/new/<search_key>")
 @cross_origin()
