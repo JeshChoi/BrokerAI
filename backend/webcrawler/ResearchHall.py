@@ -27,7 +27,7 @@ client = OpenAI(api_key=open_ai_key)
 
 
 class ResearchHall:
-    def __init__(self, client, mongo_collection, id: str, food_hall: str):
+    def __init__(self, client, mongo_collection, id: str, food_hall: str, source = None):
         food_hall = food_hall.strip().lower()
         if 'food hall' not in food_hall:
             food_hall = f'{food_hall} food hall'
@@ -36,6 +36,7 @@ class ResearchHall:
         self.mongo_collection = mongo_collection
         self.id = id
         self.food_hall = food_hall
+        self.article_source = source
         self.sources = []
         self.mongo_foodhall = None
 
@@ -289,7 +290,7 @@ class ResearchHall:
                 self.mongo_foodhall = food_hall
             else:
                 # create new food hall in the database 
-                new_foodhall = self.mongo_collection.insert_one({'name': self.food_hall, 'createdAt': datetime.now(),})
+                new_foodhall = self.mongo_collection.insert_one({'name': self.food_hall, 'article_source':self.article_source, 'createdAt': datetime.now(),})
                 self.mongo_foodhall = new_foodhall
                 pass 
         # make updates to the mongodb food hall 

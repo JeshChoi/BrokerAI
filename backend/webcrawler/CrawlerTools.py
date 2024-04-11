@@ -274,7 +274,7 @@ def determine_new_food_hall(browser, new_food_hall_article_links, res_list):
             webcontent = scrape_page_text(link, browser)
             location_instruction = 'The aim of your market research is to find out the name of new food halls after reading an article. The article may or may not have relevant information to a new food hall, so analyze the text to see if a new food hall is opened.'
             prompt = f'Find out the name of the new food hall reading this article.' + \
-                ' return the response as raw json: \'{"food_hall_name": "food_hall_name"}\' or \'{"data": null}\' if there are no new food hall.'
+                ' return the response as raw json: \'{"food_hall_name": "food_hall_name"}\' or \'{"no_new_food_hall": null}\' if there are no new food hall.'
             res = gpt_request(location_instruction, prompt + webcontent)
 
             if '```json' in res:
@@ -282,8 +282,12 @@ def determine_new_food_hall(browser, new_food_hall_article_links, res_list):
 
             json_res = json.loads(res)
             json_res['source'] = link
-            
-            res_list.append(json_res)
+
+            if "no_new_food_hall" in json_res.keys() or json_res['food_hall_name'] == 'no_new_food_hall' or json_res['food_hall_name'] in (res['food_hall_name'] for res in res_list):
+                continue
+
+            if "food_hall_name" in json_res.keys():
+                res_list.append(json_res)
         except:
             print('uh oh')
 

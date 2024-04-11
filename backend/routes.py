@@ -6,6 +6,9 @@ from selenium.webdriver.chrome.options import Options
 from webcrawler import CrawlerTools
 import threading
 
+from flask import current_app
+
+
 import os
 
 from dotenv import load_dotenv
@@ -48,11 +51,11 @@ app = Flask(__name__)
 
 @app.get("/crawler/new/<search_key>")
 @cross_origin()
-def start_new_crawl(search_key):
+def start_new_crawl(search_key, source = None):
     def task(client, search_key: str): # looks like this is how nathan mutated convex data. 
         id = client.mutation("findings:createFoodHall", {
                              "name": search_key.title()})
-        hall = ResearchHall.ResearchHall(client, foodhall_collection, id, search_key.title())
+        hall = ResearchHall.ResearchHall(client, foodhall_collection, id, search_key.title(), source = source)
         hall.run_in_parallel()
         print(hall)
         print("Done!")
@@ -82,20 +85,16 @@ def get_relevant_halls():
 @cross_origin()
 def get_new_halls_today():
     """Reads from Google alerts and adds food halls to database"""
-    hall_objects = get_relevant_halls()["relevant_halls"][:3]  # Limiting to 3 for the example
+    new_hall_list = get_relevant_halls()['relevant_halls']  # Limiting to 3 for the example
+    
+    # limit size 
+    if(len(new_hall_list) > 3):
+        new_hall_list = new_hall_list[:3]
 
-    # Use ThreadPoolExecutor to manage threads
-    with ThreadPoolExecutor(max_workers=5) as executor:
-        # Create a future for each API call
-        futures = [executor.submit(start_new_crawl, hall['food_hall_name']) for hall in hall_objects]
+    with app.app_context():
+        for hall in new_hall_list:
+            start_new_crawl(hall['food_hall_name'], hall['source'])
 
-        # Optionally, wait for each to complete and handle their result
-        for future in as_completed(futures):
-            try:
-                result = future.result()
-                print(f"Task completed with result: {result}")
-            except Exception as e:
-                print(f"Task generated an exception: {e}")
 
     # Check database for valid research 
     return jsonify({"status": "success"})
