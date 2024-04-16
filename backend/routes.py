@@ -13,9 +13,6 @@ import os
 
 from dotenv import load_dotenv
 from openai import OpenAI
-load_dotenv()
-open_ai_key = os.getenv('GPT_API_KEY')
-gpt_client = OpenAI(api_key=open_ai_key)
 from dotenv import load_dotenv
 
 import time
@@ -35,18 +32,19 @@ from bson import json_util
 load_dotenv(".env.local")
 load_dotenv()
 
+open_ai_key = os.getenv('GPT_API_KEY')
+gpt_client = OpenAI(api_key=open_ai_key)
+
 mongo_uri = os.getenv("MONGO_CONNECTION")
 mongo_client = MongoClient(mongo_uri, server_api=ServerApi('1'))
 mongodb = mongo_client.brokerai
-foodhall_collection = mongodb["foodhalls"]
+foodhall_collection = mongodb["foodhalls_csv"]
 
 try:
     mongo_client.admin.command('ping')
     print("Pinged your deployment. You successfully connected to MongoDB!")
 except Exception as e:
     print(e)
-
-client = ConvexClient(os.getenv("NEXT_PUBLIC_CONVEX_URL"))
 
 app = Flask(__name__)
 @app.get("/api/foodhalls/count")
@@ -93,15 +91,13 @@ def get_foodhalls():
 @app.get("/crawler/new/<search_key>")
 @cross_origin()
 def start_new_crawl(search_key, source = None):
-    def task(client, search_key: str): # looks like this is how nathan mutated convex data. 
-        id = client.mutation("findings:createFoodHall", {
-                             "name": search_key.title()})
-        hall = ResearchHall.ResearchHall(client, foodhall_collection, id, search_key.title(), source = source)
+    def task(search_key: str): 
+        hall = ResearchHall.ResearchHall(foodhall_collection, search_key.title(), source = source)
         hall.run_in_parallel()
         print(hall)
         print("Done!")
 
-    threading.Thread(target=task, args=(client, search_key)).start()
+    threading.Thread(target=task, args=(search_key,)).start()
     
     return "{ 'status': 'success' }"
 
@@ -134,7 +130,7 @@ def get_new_halls_today():
 
     with app.app_context():
         for hall in new_hall_list:
-            start_new_crawl(hall['food_hall_name'], hall['source'])
+            start_new_crawl(hall['food_hall_name'], source=hall['source'])
 
 
     # Check database for valid research 

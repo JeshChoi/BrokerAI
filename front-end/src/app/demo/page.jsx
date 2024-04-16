@@ -3,6 +3,7 @@ import InsightCard from "@/components/insightCard";
 import Navbar from "@/components/navbar";
 import SearchBar from "@/components/searchbar";
 import { DataTableDemo } from "@/components/views/datatable-demo";
+import { DataTableMongo } from "@/components/views/datatable-mongo";
 
 export default function DemoPage() {
   return (
@@ -34,6 +35,7 @@ export default function DemoPage() {
           </p>
 
           <DataTableDemo />
+          <DataTableMongo />
         </div>
       </div>
     </div>

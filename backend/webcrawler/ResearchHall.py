@@ -27,14 +27,12 @@ client = OpenAI(api_key=open_ai_key)
 
 
 class ResearchHall:
-    def __init__(self, client, mongo_collection, id: str, food_hall: str, source = None):
+    def __init__(self, mongo_collection, food_hall: str, source = None):
         food_hall = food_hall.strip().lower()
         if 'food hall' not in food_hall:
             food_hall = f'{food_hall} food hall'
 
-        self.client = client
         self.mongo_collection = mongo_collection
-        self.id = id
         self.food_hall = food_hall
         self.article_source = source
         self.sources = []
@@ -279,8 +277,6 @@ class ResearchHall:
     def updateDB(self, data: dict, source: dict):
         """Updates the database with the data"""
         print(f"Updating database with {data.keys()}")
-        self.client.mutation("findings:updateFoodHall",
-                             {"id": self.id, "fields": data})
         # MONGO DB changes here 
         new_data = {key: {"value": value, "source": source} for key, value in data.items()}
         if self.mongo_foodhall is None: 
@@ -296,7 +292,7 @@ class ResearchHall:
         # make updates to the mongodb food hall 
         update_result = self.mongo_collection.update_one(
             {"name": self.food_hall},  # Use the document's _id for the filter
-            {"$set": new_data,
+            {"$set": data,
              '$currentDate': {'updatedAt': True}  # Automatically set the update timestamp
             },  # Use the '$set' operator to update fields
             
@@ -367,7 +363,7 @@ class ResearchHall:
 
         # Define the tasks for each browser (quartering the total tasks)
         all_tasks = [
-            self.get_photos,
+            #self.get_photos,
             self.get_location,
             self.get_square_footage,
             self.get_number_of_food_stalls,
