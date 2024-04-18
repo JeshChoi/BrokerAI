@@ -24,10 +24,13 @@ from pymongo.mongo_client import MongoClient
 from pymongo.server_api import ServerApi
 
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from flask import Flask, jsonify
+from datetime import timedelta
+
+from flask import Flask, render_template, request, Response, send_file, jsonify
 from flask_cors import CORS, cross_origin
 from bson import json_util
 
+from download_foodhalls_as_csv import get_csv
 
 load_dotenv(".env.local")
 load_dotenv()
@@ -47,6 +50,20 @@ except Exception as e:
     print(e)
 
 app = Flask(__name__)
+
+@app.get("/download_csv")
+@cross_origin()
+def download_csv():
+    # with open("outputs/Adjacency.csv") as fp:
+    #     csv = fp.read()
+    csv = get_csv()[0]
+
+    return Response(
+        csv,
+        mimetype="text/csv",
+        headers={"Content-disposition":
+                 "attachment; filename=foodhalls.csv"})
+
 @app.get("/api/foodhalls/count")
 @cross_origin()
 def get_foodhalls_count():
@@ -122,16 +139,24 @@ def get_relevant_halls():
 @cross_origin()
 def get_new_halls_today():
     """Reads from Google alerts and adds food halls to database"""
-    new_hall_list = get_relevant_halls()['relevant_halls']  # Limiting to 3 for the example
+
+    # collect list of food hall names to research
+    new_hall_list = get_relevant_halls()['relevant_halls']  
     
-    # limit size 
-    if(len(new_hall_list) > 3):
-        new_hall_list = new_hall_list[:3]
+    # number of food halls researched in an iteration 
+    batch_size = 3
+
+    # reserach iteration 
+    wait_time = 60 * 6
 
     with app.app_context():
+        count = 0
         for hall in new_hall_list:
             start_new_crawl(hall['food_hall_name'], source=hall['source'])
-
+            count += 1
+            if(count == batch_size):
+                time.sleep(wait_time)
+                count = 0
 
     # Check database for valid research 
     return jsonify({"status": "success"})

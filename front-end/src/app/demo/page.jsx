@@ -35,7 +35,6 @@ export default function DemoPage() {
           </p>
 
           <DataTableDemo />
-          <DataTableMongo />
         </div>
       </div>
     </div>

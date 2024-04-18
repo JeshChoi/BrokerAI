@@ -1,5 +1,6 @@
 import React from 'react'
 import { useState } from 'react'
+import DownloadButton from './csvButton'
 const Navbar = () => {
     
   return (
@@ -7,9 +8,7 @@ const Navbar = () => {
         <div className='tracking-wide'>
             <span className="mr-4 font-bold text-[22px] tracking-wide">Broker <span className='text-[#FF6B00] tracking-wide'>AI</span></span> 
         </div>
-        <div>
-            <img src='austin.svg' className="ml-4 w-[45px] h-[45px]"></img> 
-        </div>
+        < DownloadButton/>
     </div>
 
   )
